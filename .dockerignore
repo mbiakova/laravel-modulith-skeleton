@@ -1,0 +1,17 @@
+# Installed inside the image, never copied from the host.
+vendor/
+node_modules/
+
+# Rebuilt at build or run time.
+bootstrap/cache/*.php
+storage/
+database/*.sqlite
+
+.git/
+.env
+.env.*
+!.env.example
+tests/
+phpunit.xml
+*.md
+docker-compose*.yml

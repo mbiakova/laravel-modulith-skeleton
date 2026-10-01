@@ -1,0 +1,102 @@
+# One container per module, each from an image that holds only its module (modulith:purge).
+# analytics reaches iam over HTTP at iam.svc; both share APP_KEY, which signs those calls.
+# Development values only: in production, set real secrets.
+
+x-env: &env
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_KEY: "base64:QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE="
+  LOG_CHANNEL: stderr
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_DATABASE: modulith
+  DB_USERNAME: modulith
+  DB_PASSWORD: modulith
+  DB_APP_USERNAME: modulith_app
+  DB_APP_PASSWORD: modulith_app
+  REDIS_HOST: redis
+  CACHE_STORE: redis
+  SESSION_DRIVER: array
+  QUEUE_CONNECTION: redis
+  MODULITH_IAM_HOST: "http://iam.svc:8000"
+  OCTANE_WORKERS: "2"
+
+x-build: &build
+  context: .
+  dockerfile: docker/Dockerfile
+  additional_contexts:
+    modulith: ../modular-monolith
+
+x-module: &module
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8000/up"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+    start_period: 30s
+
+services:
+
+  iam:
+    <<: *module
+    build:
+      <<: *build
+      args:
+        MODULITH_RUNS: iam
+    image: modulith-skeleton:iam
+    environment:
+      <<: *env
+      MODULITH_RUNS: iam
+      WITH_CONSUMERS: iam
+    ports:
+      - "8001:8000"
+    networks:
+      default:
+        aliases: [iam.svc]
+
+  analytics:
+    <<: *module
+    build:
+      <<: *build
+      args:
+        MODULITH_RUNS: analytics
+    image: modulith-skeleton:analytics
+    environment:
+      <<: *env
+      MODULITH_RUNS: analytics
+      WITH_CONSUMERS: analytics
+    ports:
+      - "8002:8000"
+
+  postgres:
+    build: ./docker/postgres
+    image: modulith-postgres:local
+    environment:
+      POSTGRES_DB: modulith
+      POSTGRES_USER: modulith
+      POSTGRES_PASSWORD: modulith
+      DB_APP_PASSWORD: modulith_app
+      MODULE_DATABASES: "iam analytics"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "modulith"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: valkey/valkey:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
