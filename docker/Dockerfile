@@ -16,8 +16,14 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --ignore-platform-reqs
 
 COPY . .
+# The packages only the purged modules required (their own composer.json) are removed; naming them keeps every other version as locked.
 RUN composer dump-autoload --no-dev \
+    && UNUSED="$(MODULITH_RUNS="$MODULITH_RUNS" php artisan modulith:unused-packages)" \
     && MODULITH_RUNS="$MODULITH_RUNS" php artisan modulith:purge --force \
+    && if [ -n "$UNUSED" ]; then \
+        composer update $UNUSED --no-dev --no-scripts --no-autoloader --ignore-platform-reqs \
+        && rm -f bootstrap/cache/packages.php bootstrap/cache/services.php; \
+    fi \
     && composer dump-autoload --optimize --no-dev
 
 # Stage 2: PHP with Swoole, for Octane.

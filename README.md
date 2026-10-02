@@ -348,7 +348,7 @@ keys. With `jwt`, give every container `AUTH_JWT_PUBLIC_KEY`, and iam `AUTH_JWT_
 
 | File | What it does |
 |---|---|
-| `docker/Dockerfile` | Installs the dependencies, purges the modules the image doesn't run, then builds the PHP and Swoole runtime. |
+| `docker/Dockerfile` | Installs the dependencies, purges the modules the image doesn't run and the packages only they required, then builds the PHP and Swoole runtime. |
 | `docker/entrypoint.sh` | Runs `optimize`, migrates (on the `http` role only), writes one consumer per module of `WITH_CONSUMERS`, then starts supervisord. |
 | `docker/supervisord.conf` | The roles a container can take, each switched on by a variable. |
 | `docker/postgres/` | A Postgres image that creates the databases of `MODULE_DATABASES`, owned by `modulith`, written by `modulith_app`. |
@@ -427,6 +427,19 @@ php artisan make:controller InvoiceController --module=billing
 
 `composer.json` lists each module and the foundation under `autoload.psr-4`. The application doesn't
 need those entries: the package autoloads the modules itself. They let your IDE resolve the classes.
+
+A library only one module uses goes in that module's `composer.json`, as `spatie/laravel-permission`
+does in `apps/Iam/composer.json`. The root `composer.json` merges `apps/*/composer.json`
+(`wikimedia/composer-merge-plugin`), so there is still one `composer.lock` and one `vendor/`:
+
+```bash
+composer require barryvdh/laravel-dompdf --working-dir=apps/Billing --no-update   # declares it in the module
+composer update barryvdh/laravel-dompdf                                           # locks and installs it
+```
+
+What every module uses (`foundation/`) stays in the root file. An image built for one module leaves
+out the packages only the other modules declared: the analytics image has no
+`spatie/laravel-permission`.
 
 ## License
 
