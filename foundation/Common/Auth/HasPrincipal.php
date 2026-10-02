@@ -16,13 +16,13 @@ trait HasPrincipal
         return $user instanceof Principal ? $user : null;
     }
 
-    protected function principalId(): ?int
+    protected function principalId(): int|string|null
     {
         return $this->principal()?->id();
     }
 
     /** For a query scoped to the caller: no principal is a 401, never an id the scope would read as someone. */
-    protected function principalIdOrFail(): int
+    protected function principalIdOrFail(): int|string
     {
         return $this->principalId() ?? throw new AuthenticationException;
     }

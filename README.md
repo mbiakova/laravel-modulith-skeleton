@@ -178,8 +178,9 @@ How strongly each piece is meant is labelled:
 | Path | What it does | Label |
 |---|---|---|
 | `Http/Controller`, `ApiRequest`, `Resource`, `ApiErrorCode` | Base controller and request, and the response format: `{success, data}` or `{success, code, message}`. | Taste |
-| `Auth/Authenticate`, `Principal`, `Principals`, `IsPrincipal`, `TokenValidator`, `HasPrincipal` | Token authentication for module routes: a token gives an id, the running module's own database gives the user. | Mechanism |
-| `Policies/Policy` | Checks a permission against `IamService::grants()`, which works wherever iam runs. | Mechanism |
+| `Auth/Authenticate`, `TokenValidator`, `PrincipalResolver`, `PermissionSource`, `Identity`, `Principal` | Token authentication for module routes, in three replaceable steps: see [Authentication](#authentication). | Mechanism |
+| `Auth/LocalPrincipals`, `ClaimsPrincipals`, `ClaimsPermissions`, `IsPrincipal`, `HasPrincipal` | The shipped answers to those steps, and the traits a user model and a controller use. | Default |
+| `Policies/Policy` | Checks a permission against the `PermissionSource`. | Mechanism |
 | `Contracts/Action`, `Operation` | One class per use case. | Proposal |
 | `Contracts/Repository`, `Database/EloquentRepository`, `Searchable` | Queries with filters, sorts and includes, and a single place for writes. | Proposal |
 | `Data/Dto` | Typed input and event payloads, built on spatie/laravel-data. | Default |
@@ -197,22 +198,30 @@ A route is protected with the `Foundation\Common\Auth\Authenticate` middleware:
 Route::get('me', [UserController::class, 'me'])->middleware(Authenticate::class);
 ```
 
-The middleware works in two steps:
+Three questions are answered in turn, each by an interface whose class `config/auth.php` names:
 
-1. The `TokenValidator` turns the token into a user id. `AUTH_TOKEN_VALIDATION_STRATEGY` picks it:
+```
+request ─► TokenValidator ─► Identity ─► PrincipalResolver ─► Principal ─► PermissionSource ─► Policy
+           who is it?        id, claims   where is the user?               what may it do?
+```
 
-   | Strategy | The token | How the module checks it | Calls iam |
-   |---|---|---|---|
-   | `jwt` (default) | a JWT iam signs at registration | with iam's public key, `AUTH_JWT_PUBLIC_KEY`; iam signs with `AUTH_JWT_PRIVATE_KEY` | no |
-   | `rpc` | an opaque token, iam stores its hash | `IamService::findUserByToken()` | yes |
-   | `gateway` | `X-Identity: {id}.{exp}.{hmac}`, set by a gateway that already authenticated the client | the HMAC, with `AUTH_GATEWAY_SECRET` | no |
+| Interface | Config key | Shipped | To add your own |
+|---|---|---|---|
+| `TokenValidator` | `auth.token_validation.strategy`, among `strategies` | `jwt`, `rpc`, `gateway` (below) | add a line to `strategies`; a `header` key in the strategy's config makes it read that header instead of the bearer token |
+| `PrincipalResolver` | `auth.principal_resolver` | `LocalPrincipals`: the user's row in the running module's own database, through the model the module names in its `config/auth.php` (`iam` reads its `User`, `analytics` its `UserShadow`). `ClaimsPrincipals`: the user is built from the token, no row | name your class |
+| `PermissionSource` | `auth.permission_source` | `IamPermissions`: `IamService::grants()`. `ClaimsPermissions`: the `permissions` claim of the token | name your class |
 
-2. `Principals` loads that user from the running module's own database, through the model the
-   module names in its `config/auth.php`: `iam` reads its `User`, `analytics` its `UserShadow`.
+The three strategies, picked by `AUTH_TOKEN_VALIDATION_STRATEGY`:
 
-A token is refused (401, Laravel's `AuthenticationException`) when it proves nothing, and also
-when the module has no copy of the user yet: a user who has just registered reaches `analytics`
-once it has consumed `iam.user.registered`.
+| Strategy | The token | How the module checks it | Calls iam |
+|---|---|---|---|
+| `jwt` (default) | a JWT iam signs at registration | with the issuer's public key, `AUTH_JWT_PUBLIC_KEY`; iam signs with `AUTH_JWT_PRIVATE_KEY` | no |
+| `rpc` | an opaque token, iam stores its hash | `IamService::findUserByToken()` | yes |
+| `gateway` | `X-Identity: {id}.{exp}.{hmac}`, set by a gateway that already authenticated the client | the HMAC, with `AUTH_GATEWAY_SECRET` | no |
+
+A token is refused (401, Laravel's `AuthenticationException`) when it proves nothing. With
+`LocalPrincipals` it is also refused while the module has no copy of the user: a user who has just
+registered reaches `analytics` once it has consumed `iam.user.registered`.
 
 In a controller that extends `Foundation\Common\Http\Controller`, `$this->principalId()` returns the id of
 the authenticated user.
@@ -265,6 +274,29 @@ This configuration hasn't been run against a Traefik instance; the route it call
 To let the gateway emit events or call the modules itself, see "Services in other languages" in
 the package's README.
 
+### An identity provider outside the application
+
+The modules can be the core of a larger system whose users are managed elsewhere (a Node service,
+Keycloak, Auth0). Nothing of iam is needed then: the token says who the user is and what it may do.
+
+```dotenv
+AUTH_TOKEN_VALIDATION_STRATEGY=jwt
+AUTH_JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----…"            # the provider's RS256 public key
+AUTH_PRINCIPAL_RESOLVER=Foundation\Common\Auth\ClaimsPrincipals     # no quotes: a quoted backslash doesn't parse
+AUTH_PERMISSION_SOURCE=Foundation\Common\Auth\ClaimsPermissions
+```
+
+| The provider's token | What the modules read |
+|---|---|
+| `sub` | the user's id, an integer or a string (`usr_7f3a`) |
+| `permissions` (`auth.permissions_claim`) | the list the policies check, such as `analytics.datasets.read` |
+| any other claim | the user is a `ClaimsPrincipal`: `$principal->claim('email')` |
+
+A provider that signs differently, or an API key, is a `TokenValidator` of your own.
+`apps/Analytics/tests/Feature/ExternalIdentityTest.php` runs both cases. To keep the users' names
+locally all the same, the provider can feed the modules' copies: see "Being the source of a copy"
+in the package's `docs/other-languages.md`.
+
 ### Without authentication
 
 The package has no authentication of its own: all of it lives in this skeleton, in
@@ -272,12 +304,12 @@ The package has no authentication of its own: all of it lives in this skeleton, 
 
 | File | What to remove |
 |---|---|
-| `foundation/FoundationServiceProvider.php` | the `TokenValidator` binding |
+| `foundation/FoundationServiceProvider.php` | the three bindings of `register()` |
 | `apps/*/routes/api.php` | the `Authenticate` middleware |
 | `foundation/Common/Http/Controller.php`, `ApiRequest.php` | `use HasPrincipal` |
 | `apps/Iam/app/Models/User.php`, `foundation/Iam/Shadows/UserShadow.php` | `IsPrincipal` and `implements Principal` |
 | `apps/Analytics/app/Policies/DatasetPolicy.php` | the policy, and `authorize()` in `DatasetController` |
-| `tests/Feature/ModulesTest.php`, `AnalyticsAloneTest.php` | the tests that send a token |
+| `tests/ModuleTestCase.php`, `apps/*/tests`, `tests/Feature/ModulesTest.php` | the tests that send a token |
 
 ## Permissions
 

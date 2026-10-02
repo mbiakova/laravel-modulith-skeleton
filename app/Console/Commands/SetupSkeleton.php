@@ -28,7 +28,7 @@ final class SetupSkeleton extends Command
         'analytics' => [
             'tests' => ['ModulesTest'],
             'lines' => ['config/auth.php' => [
-                "use Foundation\\Analytics\\Enums\\AnalyticsPermission;\n\n",
+                "use Foundation\\Analytics\\Enums\\AnalyticsPermission;\n",
                 "        AnalyticsPermission::class,\n",
             ]],
         ],

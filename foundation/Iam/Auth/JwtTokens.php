@@ -6,11 +6,12 @@ namespace Foundation\Iam\Auth;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+use Foundation\Common\Auth\Identity;
 use Foundation\Common\Auth\TokenValidator;
 use InvalidArgumentException;
 use Throwable;
 
-/** The token is a JWT iam signed: the module checks it with iam's public key, without calling iam. */
+/** The token is a JWT: the module checks it with its issuer's public key, without calling the issuer. */
 final readonly class JwtTokens implements TokenValidator
 {
     private Key $key;
@@ -24,14 +25,21 @@ final readonly class JwtTokens implements TokenValidator
         $this->key = new Key($publicKey, 'RS256');
     }
 
-    public function validate(string $token): ?int
+    public function validate(string $token): ?Identity
     {
         try {
-            $claims = JWT::decode($token, $this->key);
+            /** @var array<string, mixed> $claims */
+            $claims = json_decode((string) json_encode(JWT::decode($token, $this->key)), true);
         } catch (Throwable) {
             return null;
         }
 
-        return isset($claims->sub) && is_numeric($claims->sub) ? (int) $claims->sub : null;
+        $subject = $claims['sub'] ?? null;
+
+        if (! is_string($subject) && ! is_int($subject) || $subject === '') {
+            return null;
+        }
+
+        return new Identity(ctype_digit((string) $subject) ? (int) $subject : $subject, $claims);
     }
 }
