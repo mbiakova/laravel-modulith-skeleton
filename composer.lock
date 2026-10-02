@@ -2342,7 +2342,7 @@
             "dist": {
                 "type": "path",
                 "url": "../modular-monolith",
-                "reference": "fbf82e9614e390c4374f52fda0251abfbfb9acbb"
+                "reference": "41ff0e27b8d9ab0163a6059fb320e57e872e0bcd"
             },
             "require": {
                 "laravel/framework": "^12.0 || ^13.0",

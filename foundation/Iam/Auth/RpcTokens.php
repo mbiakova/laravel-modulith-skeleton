@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Foundation\Iam\Auth;
 
+use Foundation\Common\Auth\Identity;
 use Foundation\Common\Auth\TokenValidator;
 use Foundation\Iam\Contracts\IamService;
 
@@ -12,8 +13,10 @@ final readonly class RpcTokens implements TokenValidator
 {
     public function __construct(private IamService $iam) {}
 
-    public function validate(string $token): ?int
+    public function validate(string $token): ?Identity
     {
-        return $this->iam->findUserByToken($token)['id'] ?? null;
+        $user = $this->iam->findUserByToken($token);
+
+        return $user === null ? null : new Identity($user['id']);
     }
 }

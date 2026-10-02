@@ -1,6 +1,11 @@
 <?php
 
 use Foundation\Analytics\Enums\AnalyticsPermission;
+use Foundation\Common\Auth\LocalPrincipals;
+use Foundation\Iam\Auth\GatewayTokens;
+use Foundation\Iam\Auth\IamPermissions;
+use Foundation\Iam\Auth\JwtTokens;
+use Foundation\Iam\Auth\RpcTokens;
 
 return [
 
@@ -23,9 +28,14 @@ return [
         ],
     ],
 
-    // jwt | rpc | gateway: how a token becomes a user id, see the README's Authentication section.
+    // How a token proves an identity, see the README's Authentication section. A strategy is a TokenValidator: add yours here.
     'token_validation' => [
         'strategy' => env('AUTH_TOKEN_VALIDATION_STRATEGY', 'jwt'),
+        'strategies' => [
+            'jwt' => JwtTokens::class,
+            'rpc' => RpcTokens::class,
+            'gateway' => GatewayTokens::class,
+        ],
         'jwt' => [
             // The PEM itself, or else the file `php artisan auth:jwt-keys` writes.
             'public_key' => env('AUTH_JWT_PUBLIC_KEY') ?: (is_file($public = storage_path('jwt-public.key')) ? file_get_contents($public) : null),
@@ -38,8 +48,15 @@ return [
         ],
     ],
 
-    // module => the model its users are read from; each module adds its entry in its config/auth.php.
+    // Where the user of a request comes from: LocalPrincipals reads the module's own database, ClaimsPrincipals only the token.
+    'principal_resolver' => env('AUTH_PRINCIPAL_RESOLVER', LocalPrincipals::class),
+
+    // module => the model LocalPrincipals reads its users from; each module adds its entry in its config/auth.php.
     'principals' => [],
+
+    // Who says what a user may do: IamPermissions asks iam, ClaimsPermissions reads the claim named below in the token.
+    'permission_source' => env('AUTH_PERMISSION_SOURCE', IamPermissions::class),
+    'permissions_claim' => 'permissions',
 
     // The permission enums of every module, in the foundation so iam knows them wherever it runs: iam:sync-permissions creates them.
     'permissions' => [

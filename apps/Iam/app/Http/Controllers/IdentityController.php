@@ -13,16 +13,16 @@ use Symfony\Component\HttpFoundation\Response;
 /** The target of a proxy's forward-auth (Traefik ForwardAuth, nginx auth_request): a valid JWT gets the X-Identity the modules trust. */
 final class IdentityController
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, JwtTokens $tokens): Response
     {
-        $id = (new JwtTokens((string) config('auth.token_validation.jwt.public_key')))->validate((string) $request->bearerToken());
+        $id = $tokens->validate((string) $request->bearerToken())?->id;
 
-        if ($id === null || ! User::query()->whereKey($id)->exists()) {
+        if (! is_int($id) || ! User::query()->whereKey($id)->exists()) {
             return response()->noContent(401);
         }
 
-        $identity = GatewayTokens::sign($id, time() + 60, (string) config('auth.token_validation.gateway.secret'));
+        $signed = GatewayTokens::sign($id, time() + 60, (string) config('auth.token_validation.gateway.secret'));
 
-        return response()->noContent()->header((string) config('auth.token_validation.gateway.header'), $identity);
+        return response()->noContent()->header((string) config('auth.token_validation.gateway.header'), $signed);
     }
 }

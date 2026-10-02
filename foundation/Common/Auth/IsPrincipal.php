@@ -13,8 +13,10 @@ trait IsPrincipal
     use Authenticatable;
     use Authorizable;
 
-    public function id(): int
+    public function id(): int|string
     {
-        return (int) $this->getKey();
+        $key = $this->getKey();
+
+        return is_int($key) ? $key : (string) $key;
     }
 }

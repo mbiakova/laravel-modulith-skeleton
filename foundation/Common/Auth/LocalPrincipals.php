@@ -6,12 +6,12 @@ namespace Foundation\Common\Auth;
 
 use Modulith\Services\Modules\ModuleContext;
 
-/** Loads a user from the database of the running module, through the model auth.principals names for it. */
-final readonly class Principals
+/** Loads the user from the database of the running module, through the model auth.principals names for it. */
+final readonly class LocalPrincipals implements PrincipalResolver
 {
     public function __construct(private ModuleContext $context) {}
 
-    public function find(int $id): ?Principal
+    public function resolve(Identity $identity): ?Principal
     {
         $model = config('auth.principals.'.$this->context->current()?->name);
 
@@ -19,7 +19,7 @@ final readonly class Principals
             return null;
         }
 
-        $principal = $model::query()->find($id);
+        $principal = $model::query()->find($identity->id);
 
         return $principal instanceof Principal ? $principal : null;
     }
