@@ -54,6 +54,7 @@ services:
       <<: *env
       MODULITH_RUNS: iam
       WITH_CONSUMERS: iam
+      SYNC_PERMISSIONS: "true"
       DB_DATABASE: app_iam   # each service has its own application database, migrated by it alone
     ports:
       - "${IAM_PORT:-8001}:8000"

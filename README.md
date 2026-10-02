@@ -18,10 +18,11 @@ cp .env.example .env
 php artisan key:generate
 php artisan auth:jwt-keys     # the RSA pair iam signs tokens with, in storage/jwt-*.key
 php artisan migrate           # migrates the application's database, then each module's
+php artisan iam:sync-permissions --prune   # the permissions listed in auth.permissions, see Permissions
 php artisan serve
 ```
 
-`composer create-project` runs the first three steps itself. The modules use sqlite files by
+`composer create-project` runs every step but `serve` itself. The modules use sqlite files by
 default (`database/iam.sqlite`, `database/analytics.sqlite`, `database/notifications.sqlite`).
 `migrate` creates them.
 
@@ -195,6 +196,29 @@ once it has consumed `iam.user.registered`.
 
 In a controller that extends `Foundation\Common\Http\Controller`, `$this->principalId()` returns the id of
 the authenticated user.
+
+## Permissions
+
+Roles and permissions belong to `iam`, which keeps them with `spatie/laravel-permission` in its
+`iam_*` tables. Every other module asks for them through `IamService::grants($userId)`. That call
+goes through RPC and the answer is cached.
+
+- A module declares its permissions as an enum in the foundation, for example
+  `Foundation\Analytics\Enums\AnalyticsPermission`, and lists it in `auth.permissions`.
+  `php artisan iam:sync-permissions` then creates the declared permissions and drops every
+  cached grant. With `--prune` it also deletes the permissions no enum declares, and every role's
+  and user's hold on them: an enum missing from the list loses its grants. `composer setup`,
+  `create-project` and the container whose `SYNC_PERMISSIONS` is `true` (iam's) run it with `--prune`.
+- A policy extends `Foundation\Common\Policies\Policy` and checks
+  `$this->allows($user, AnalyticsPermission::ReadDatasets)`. A controller calls
+  `$this->authorize('viewAny', Dataset::class)`, which answers 403 when the user lacks the permission.
+- Change permissions only through iam's actions, never by calling spatie directly, so the cache
+  stays right. Each action clears the cache once its transaction commits:
+
+  | Action | Clears |
+  |---|---|
+  | `GrantRole::grant()` / `revoke()` | that user's cached grants |
+  | `SetRolePermissions::execute()` | every user's cached grants |
 
 ## Running a module in its own process
 

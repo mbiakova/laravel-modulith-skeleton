@@ -10,6 +10,7 @@ use Foundation\Common\Database\Searchable;
 use Illuminate\Database\Eloquent\Model;
 use Modulith\Contracts\Shadows\Shadowed;
 use Modulith\Traits\ShadowSource;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * @property int $id
@@ -20,11 +21,14 @@ use Modulith\Traits\ShadowSource;
  */
 final class User extends Model implements Principal, Shadowed
 {
+    use HasRoles;
     use IsPrincipal;
     use Searchable;
     use ShadowSource;
 
     protected $table = 'iam_users';
+
+    protected string $guard_name = 'web';
 
     protected $fillable = ['name', 'email', 'password', 'api_token'];
 

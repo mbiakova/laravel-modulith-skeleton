@@ -2,10 +2,21 @@
 
 namespace Tests\Feature;
 
+use Apps\Iam\Actions\GrantRole;
+use Apps\Iam\Actions\SetRolePermissions;
+use Apps\Iam\Models\User;
+use Foundation\Analytics\Enums\AnalyticsPermission;
 use Tests\TestCase;
 
 class DatasetsTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->artisan('iam:sync-permissions')->assertSuccessful();
+    }
+
     public function test_a_reading_folds_the_hourly_rows_a_flow_adding_up_and_a_state_keeping_the_last(): void
     {
         $token = $this->signUpAt('ada', '2026-03-02 09:15');
@@ -42,6 +53,11 @@ class DatasetsTest extends TestCase
         $token = $this->postJson('/iam/api/v1/users', ['name' => $name, 'email' => "{$name}@example.com", 'password' => 'correct-horse'])->json('data.token');
         $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
         $this->travelBack();
+
+        $this->inModuleOf(User::class, function () use ($name): void {
+            app(SetRolePermissions::class)->execute('analyst', [AnalyticsPermission::ReadDatasets]);
+            app(GrantRole::class)->grant(User::query()->where('email', "{$name}@example.com")->firstOrFail(), 'analyst');
+        });
 
         return $token;
     }

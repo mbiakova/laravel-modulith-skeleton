@@ -34,6 +34,7 @@ services:
       MODULITH_RUNS: "*"
       WITH_CONSUMERS: "iam,analytics,notifications"
       WITH_SCHEDULER: "true"
+      SYNC_PERMISSIONS: "true"
     ports:
       - "${APP_PORT:-8000}:8000"
     depends_on:

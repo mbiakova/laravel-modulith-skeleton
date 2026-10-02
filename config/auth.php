@@ -1,5 +1,7 @@
 <?php
 
+use Foundation\Analytics\Enums\AnalyticsPermission;
+
 return [
 
     // Authenticate sets the guard user itself: the provider never loads one, so it names no model.
@@ -38,5 +40,10 @@ return [
 
     // module => the model its users are read from; each module adds its entry in its config/auth.php.
     'principals' => [],
+
+    // The permission enums of every module, in the foundation so iam knows them wherever it runs: iam:sync-permissions creates them.
+    'permissions' => [
+        AnalyticsPermission::class,
+    ],
 
 ];

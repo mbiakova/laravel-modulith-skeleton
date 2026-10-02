@@ -10,6 +10,11 @@ if [ "${WITH_HTTP:-true}" = "true" ]; then
     php artisan migrate --force
 fi
 
+# Only the container that runs iam owns the permissions.
+if [ "${SYNC_PERMISSIONS:-false}" = "true" ]; then
+    php artisan iam:sync-permissions --prune
+fi
+
 # One consumer per module listed in WITH_CONSUMERS: a second one for the same module would break the order it reads in.
 mkdir -p /tmp/supervisor
 rm -f /tmp/supervisor/*.conf

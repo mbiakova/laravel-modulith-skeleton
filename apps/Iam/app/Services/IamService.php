@@ -20,6 +20,13 @@ final readonly class IamService implements Contract
         return $this->present(User::query()->where('api_token', hash('sha256', $token))->first());
     }
 
+    public function grants(int $userId): array
+    {
+        $user = User::query()->find($userId);
+
+        return $user === null ? [] : array_values($user->getAllPermissions()->pluck('name')->map(strval(...))->all());
+    }
+
     /** @return array{id: int, name: string}|null */
     private function present(?User $user): ?array
     {
