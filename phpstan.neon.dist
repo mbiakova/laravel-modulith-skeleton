@@ -1,0 +1,17 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+
+    configDirectories:
+        - config
+        - apps/*/config
+
+    paths:
+        - app
+        - apps
+        - foundation
+        - bootstrap/app.php
+        - config
+        - tests

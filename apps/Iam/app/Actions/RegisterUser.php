@@ -6,27 +6,24 @@ namespace Apps\Iam\Actions;
 
 use Apps\Iam\Events\UserRegistered;
 use Apps\Iam\Models\User;
+use Foundation\Iam\Events\UserRegisteredPayload;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Modulith\Contracts\Stream\Bus;
 
 final readonly class RegisterUser
 {
-    public function __construct(private Bus $bus) {}
+    public function __construct(private Bus $bus, private IssueToken $tokens) {}
 
-    /** @return array{user: User, token: string} the token is returned once; only its hash is stored */
-    public function execute(string $name, string $email): array
+    /** @return array{user: User, token: string} */
+    public function execute(string $name, string $email, string $password): array
     {
-        $token = Str::random(40);
+        return DB::transaction(function () use ($name, $email, $password): array {
+            $user = User::query()->create(['name' => $name, 'email' => $email, 'password' => $password]);
+            $token = $this->tokens->execute($user);
 
-        $user = DB::transaction(function () use ($name, $email, $token): User {
-            $user = User::query()->create(['name' => $name, 'email' => $email, 'api_token' => hash('sha256', $token)]);
+            $this->bus->emit(new UserRegistered(new UserRegisteredPayload(id: $user->id)));
 
-            $this->bus->emit(new UserRegistered((int) $user->getKey()));
-
-            return $user;
+            return ['user' => $user, 'token' => $token];
         });
-
-        return ['user' => $user, 'token' => $token];
     }
 }

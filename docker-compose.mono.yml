@@ -18,6 +18,7 @@ x-env: &env
   CACHE_STORE: redis
   SESSION_DRIVER: array
   QUEUE_CONNECTION: redis
+  AUTH_TOKEN_VALIDATION_STRATEGY: rpc   # jwt needs AUTH_JWT_PUBLIC_KEY / AUTH_JWT_PRIVATE_KEY
 
 services:
 
@@ -31,7 +32,8 @@ services:
     environment:
       <<: *env
       MODULITH_RUNS: "*"
-      WITH_CONSUMERS: "iam,analytics"
+      WITH_CONSUMERS: "iam,analytics,notifications"
+      WITH_SCHEDULER: "true"
     ports:
       - "${APP_PORT:-8000}:8000"
     depends_on:
@@ -54,7 +56,7 @@ services:
       POSTGRES_USER: modulith
       POSTGRES_PASSWORD: modulith
       DB_APP_PASSWORD: modulith_app
-      MODULE_DATABASES: "iam analytics"
+      MODULE_DATABASES: "iam analytics notifications"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "firebase/php-jwt": "^7.0",
         "laravel/framework": "^13.8",
         "laravel/octane": "^2.20",
         "laravel/tinker": "^3.0",
@@ -16,6 +17,7 @@
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.12",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",
@@ -26,14 +28,26 @@
     "autoload": {
         "psr-4": {
             "App\\": "app/",
-            "Shared\\": "shared/",
             "Database\\Factories\\": "database/factories/",
-            "Database\\Seeders\\": "database/seeders/"
+            "Database\\Seeders\\": "database/seeders/",
+            "Foundation\\": "foundation/",
+            "Apps\\Iam\\": "apps/Iam/app/",
+            "Apps\\Iam\\Database\\Factories\\": "apps/Iam/database/factories/",
+            "Apps\\Iam\\Database\\Seeders\\": "apps/Iam/database/seeders/",
+            "Apps\\Analytics\\": "apps/Analytics/app/",
+            "Apps\\Analytics\\Database\\Factories\\": "apps/Analytics/database/factories/",
+            "Apps\\Analytics\\Database\\Seeders\\": "apps/Analytics/database/seeders/",
+            "Apps\\Notifications\\": "apps/Notifications/app/",
+            "Apps\\Notifications\\Database\\Factories\\": "apps/Notifications/database/factories/",
+            "Apps\\Notifications\\Database\\Seeders\\": "apps/Notifications/database/seeders/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "Tests\\": "tests/",
+            "Apps\\Iam\\Tests\\": "apps/Iam/tests/",
+            "Apps\\Analytics\\Tests\\": "apps/Analytics/tests/",
+            "Apps\\Notifications\\Tests\\": "apps/Notifications/tests/"
         }
     },
     "scripts": {
@@ -41,17 +55,21 @@
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
-            "@php artisan migrate --force",
-            "npm install --ignore-scripts",
-            "npm run build"
+            "@php artisan auth:jwt-keys",
+            "@php artisan migrate --force"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+            "@php artisan serve"
         ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",
             "@php artisan test"
+        ],
+        "check": [
+            "pint --test",
+            "phpstan analyse --memory-limit=1G",
+            "@test"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
@@ -65,6 +83,7 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
+            "@php artisan auth:jwt-keys --ansi",
             "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],

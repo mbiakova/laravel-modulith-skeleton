@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace Apps\Analytics\Rules;
 
-use Closure;
+use Foundation\Common\Validation\ReferenceRule;
 use Foundation\Iam\Contracts\IamService;
-use Illuminate\Contracts\Validation\ValidationRule;
 
-/** Asks iam through its contract: a plain call when iam runs here, a signed RPC call otherwise. */
-final readonly class ExistingUser implements ValidationRule
+/**
+ * Asks iam through its contract: a plain call when iam runs here, a signed RPC call otherwise.
+ *
+ * @extends ReferenceRule<array{id: int, name: string}>
+ */
+final class ExistingUser extends ReferenceRule
 {
-    public function __construct(private IamService $iam) {}
+    public function __construct(private readonly IamService $iam) {}
 
-    public function validate(string $attribute, mixed $value, Closure $fail): void
+    protected function resolve(int $id): ?array
     {
-        if (! is_numeric($value) || $this->iam->findUser((int) $value) === null) {
-            $fail('No user has this id.');
-        }
+        return $this->iam->findUser($id);
+    }
+
+    protected function missing(): string
+    {
+        return 'No user has this id.';
     }
 }

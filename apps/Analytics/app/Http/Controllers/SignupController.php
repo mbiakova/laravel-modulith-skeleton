@@ -7,9 +7,9 @@ namespace Apps\Analytics\Http\Controllers;
 use Apps\Analytics\Http\Requests\ListSignupsRequest;
 use Apps\Analytics\Http\Resources\SignupResource;
 use Apps\Analytics\Models\Signup;
+use Foundation\Common\Http\Controller;
 use Foundation\Iam\Contracts\IamService;
 use Illuminate\Http\JsonResponse;
-use Shared\Http\Controller;
 
 final class SignupController extends Controller
 {

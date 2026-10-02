@@ -12,6 +12,7 @@ database/*.sqlite
 .env.*
 !.env.example
 tests/
+apps/*/tests/
 phpunit.xml
 *.md
 docker-compose*.yml

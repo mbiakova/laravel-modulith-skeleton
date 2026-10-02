@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Apps\Iam\Http\Requests;
 
-use Shared\Http\ApiRequest;
+use Apps\Iam\Models\User;
+use Foundation\Common\Http\ApiRequest;
+use Illuminate\Validation\Rule;
 
 final class RegisterUserRequest extends ApiRequest
 {
-    /** @return array<string, list<string>> */
+    /** @return array<string, list<mixed>> */
     public function rules(): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:iam_users,email'],
+            'email' => ['required', 'email', Rule::unique(User::class, 'email')],
+            'password' => ['required', 'string', 'min:8'],
         ];
     }
 }

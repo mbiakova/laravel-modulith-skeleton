@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      # composer.json reaches the package through a path repository at ../modular-monolith.
+      - uses: actions/checkout@v4
+        with:
+          path: skeleton
+
+      - uses: actions/checkout@v4
+        with:
+          repository: mk-josias/laravel-modulith
+          path: modular-monolith
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php: '8.4'
+          coverage: none
+
+      - name: Install dependencies
+        working-directory: skeleton
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Pint, PHPStan, tests
+        working-directory: skeleton
+        run: composer check

@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace Foundation\Iam\Shadows;
 
+use Foundation\Common\Auth\IsPrincipal;
+use Foundation\Common\Auth\Principal;
 use Modulith\Models\ShadowModel;
 
 /**
  * @property int $id
  * @property string $name
  */
-abstract class UserShadow extends ShadowModel
+abstract class UserShadow extends ShadowModel implements Principal
 {
+    use IsPrincipal;
+
     public static function owner(): string
     {
         return 'iam';

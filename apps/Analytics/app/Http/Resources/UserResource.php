@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Apps\Analytics\Http\Resources;
 
 use Apps\Analytics\Models\UserShadow;
+use Foundation\Common\Http\Resource;
 use Illuminate\Http\Request;
-use Shared\Http\Resource;
 
 /** @mixin UserShadow */
 final class UserResource extends Resource

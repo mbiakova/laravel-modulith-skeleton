@@ -14,7 +14,7 @@ final class IamRpcService extends RpcService implements IamService
         return $this->readThrough(
             self::userKey($id),
             self::DEFAULT_TTL,
-            fn (): mixed => $this->call('users', 'find', ['id' => $id]),
+            fn (): mixed => $this->call('findUser', ['id' => $id]),
             fn (array $raw): array => ['id' => (int) $raw['id'], 'name' => (string) $raw['name']],
         );
     }
@@ -22,7 +22,7 @@ final class IamRpcService extends RpcService implements IamService
     /** Not cached: a token is checked on every request, and a revoked one must stop working at once. */
     public function findUserByToken(string $token): ?array
     {
-        $raw = $this->call('users', 'find-by-token', ['token' => $token]);
+        $raw = $this->call('findUserByToken', ['token' => $token]);
 
         return is_array($raw) ? ['id' => (int) $raw['id'], 'name' => (string) $raw['name']] : null;
     }

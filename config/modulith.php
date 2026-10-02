@@ -17,6 +17,7 @@ return [
     'modules' => [
         'iam' => ['host' => env('MODULITH_IAM_HOST')],
         'analytics' => [],
+        'notifications' => [],
     ],
 
     // Modules booted by THIS process: '*' = all, or a comma-separated list.

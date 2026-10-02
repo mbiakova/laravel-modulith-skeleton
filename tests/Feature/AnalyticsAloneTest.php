@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use Apps\Analytics\Models\UserShadow;
+use Firebase\JWT\JWT;
+use Foundation\Iam\Auth\GatewayTokens;
 use Foundation\Iam\Contracts\IamService;
 use Foundation\Iam\Services\IamRpcService;
 use Illuminate\Http\Client\Request;
@@ -18,11 +21,14 @@ class AnalyticsAloneTest extends TestCase
 
         parent::setUp();
 
+        config()->set('auth.token_validation.strategy', 'rpc');
+        $this->inModuleOf(UserShadow::class, fn () => UserShadow::sync(1, ['name' => 'Ada']));
+
         Http::fake([
-            'iam.test/iam/rpc/v1/users/find-by-token' => fn (Request $request) => $request['token'] === 'ada-token'
+            'iam.test/iam/rpc/findUserByToken' => fn (Request $request) => $request['arguments']['token'] === 'ada-token'
                 ? Http::response(['id' => 1, 'name' => 'Ada'])
                 : Http::response(null, 404),
-            'iam.test/iam/rpc/v1/users/find' => fn (Request $request) => $request['id'] === 1
+            'iam.test/iam/rpc/findUser' => fn (Request $request) => $request['arguments']['id'] === 1
                 ? Http::response(['id' => 1, 'name' => 'Ada'])
                 : Http::response(null, 404),
         ]);
@@ -47,8 +53,29 @@ class AnalyticsAloneTest extends TestCase
 
         $this->getJson('/analytics/api/v1/signups', ['Authorization' => 'Bearer ada-token'])->assertOk();
 
-        Http::assertSent(fn (Request $request): bool => $request->url() === 'http://iam.test/iam/rpc/v1/users/find-by-token'
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'http://iam.test/iam/rpc/findUserByToken'
             && $request->hasHeader(RpcSignature::SIGNATURE_HEADER));
+    }
+
+    public function test_the_jwt_strategy_authenticates_a_token_iam_signed_without_calling_iam(): void
+    {
+        config()->set('auth.token_validation.strategy', 'jwt');
+        $token = JWT::encode(['sub' => '1', 'exp' => time() + 60], (string) config('auth.token_validation.jwt.private_key'), 'RS256');
+
+        $this->getJson('/analytics/api/v1/signups', ['Authorization' => "Bearer {$token}"])->assertOk();
+        $this->getJson('/analytics/api/v1/signups', ['Authorization' => 'Bearer ada-token'])->assertUnauthorized();
+
+        Http::assertNothingSent();
+    }
+
+    public function test_the_gateway_strategy_authenticates_the_identity_the_gateway_signed_without_calling_iam(): void
+    {
+        config()->set('auth.token_validation.strategy', 'gateway');
+
+        $this->getJson('/analytics/api/v1/signups', ['X-Identity' => GatewayTokens::sign(1, time() + 60, 'testing-gateway-secret')])->assertOk();
+        $this->getJson('/analytics/api/v1/signups', ['X-Identity' => GatewayTokens::sign(2, time() + 60, 'testing-gateway-secret')])->assertUnauthorized();
+
+        Http::assertNothingSent();
     }
 
     public function test_the_validation_rule_asks_iam_over_http(): void

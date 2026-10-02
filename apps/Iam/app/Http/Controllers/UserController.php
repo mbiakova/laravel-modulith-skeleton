@@ -6,8 +6,8 @@ namespace Apps\Iam\Http\Controllers;
 
 use Apps\Iam\Actions\RegisterUser;
 use Apps\Iam\Http\Requests\RegisterUserRequest;
+use Foundation\Common\Http\Controller;
 use Illuminate\Http\JsonResponse;
-use Shared\Http\Controller;
 
 final class UserController extends Controller
 {
@@ -16,6 +16,7 @@ final class UserController extends Controller
         ['user' => $user, 'token' => $token] = $register->execute(
             $request->string('name')->toString(),
             $request->string('email')->toString(),
+            $request->string('password')->toString(),
         );
 
         return $this->created(['id' => $user->getKey(), 'name' => $user->name, 'token' => $token]);

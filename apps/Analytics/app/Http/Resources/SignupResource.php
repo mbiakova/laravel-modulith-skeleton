@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Apps\Analytics\Http\Resources;
 
 use Apps\Analytics\Models\Signup;
+use Foundation\Common\Http\Resource;
 use Illuminate\Http\Request;
-use Shared\Http\Resource;
 
 /**
  * The user comes from analytics' own copy of iam's users: no call to iam per row.

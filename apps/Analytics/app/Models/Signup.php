@@ -6,9 +6,11 @@ namespace Apps\Analytics\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $user_id
+ * @property Carbon $created_at
  * @property-read UserShadow|null $user
  */
 final class Signup extends Model

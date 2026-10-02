@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Apps\Analytics\Http\Requests;
 
 use Apps\Analytics\Rules\ExistingUser;
-use Shared\Http\ApiRequest;
+use Foundation\Common\Http\ApiRequest;
 
 final class ListSignupsRequest extends ApiRequest
 {
