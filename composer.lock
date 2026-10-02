@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5f9a33c54f413dbe9a851b80e2ca9eea",
+    "content-hash": "a12913baf2f21afa484fa79d29998a0d",
     "packages": [
         {
             "name": "brick/math",
@@ -2342,7 +2342,7 @@
             "dist": {
                 "type": "path",
                 "url": "../modular-monolith",
-                "reference": "354f5c05e7ab6f4185f40d9d0f5cede2b820f32f"
+                "reference": "9908cfc9cc5e41515db3f8908d182577ae877d2b"
             },
             "require": {
                 "laravel/framework": "^12.0 || ^13.0",
@@ -2391,7 +2391,7 @@
                     "phpstan analyse --memory-limit=1G"
                 ],
                 "check": [
-                    "@lint",
+                    "pint --test",
                     "@analyse",
                     "@test"
                 ]
