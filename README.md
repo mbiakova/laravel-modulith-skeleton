@@ -83,7 +83,6 @@ curl http://127.0.0.1:8000/notifications/api/v1/notifications \
 ## What is in the skeleton
 
 ```
-app/                  your Laravel application
 config/modulith.php   declares the modules, and where they run when they run elsewhere
 apps/
 ├── Iam/              owns the users
