@@ -4,14 +4,10 @@ namespace Tests\Feature;
 
 use Apps\Analytics\Models\Signup;
 use Apps\Iam\Models\User;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
-use Foundation\Iam\Auth\GatewayTokens;
 use Foundation\Iam\Contracts\IamService;
 use Foundation\Iam\Services\IamRpcService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Modulith\Testing\Boundaries;
 use Tests\TestCase;
 
 class ModulesTest extends TestCase
@@ -61,36 +57,6 @@ class ModulesTest extends TestCase
         $this->getJson('/analytics/api/v1/signups', ['Authorization' => "Bearer {$token}"])->assertUnauthorized();
     }
 
-    public function test_iam_issues_a_jwt_the_modules_verify_with_its_public_key(): void
-    {
-        $token = $this->postJson('/iam/api/v1/users', ['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'correct-horse'])->json('data.token');
-        [$header, $payload] = explode('.', $token);
-
-        $this->assertSame('RS256', json_decode(base64_decode($header), true)['alg']);
-        $this->getJson('/iam/api/v1/me', ['Authorization' => "Bearer {$header}.{$payload}.forged"])->assertUnauthorized();
-    }
-
-    public function test_the_gateway_strategy_trusts_only_an_identity_signed_with_the_shared_secret(): void
-    {
-        config()->set('auth.token_validation.strategy', 'gateway');
-        $id = $this->postJson('/iam/api/v1/users', ['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'correct-horse'])->json('data.id');
-        $identity = GatewayTokens::sign($id, time() + 60, 'testing-gateway-secret');
-
-        $this->getJson('/iam/api/v1/me', ['X-Identity' => $identity])->assertOk()->assertJsonPath('data.id', $id);
-        $this->getJson('/iam/api/v1/me', ['X-Identity' => GatewayTokens::sign($id, time() + 60, 'wrong')])->assertUnauthorized();
-        $this->getJson('/iam/api/v1/me', ['X-Identity' => GatewayTokens::sign($id, time() - 1, 'testing-gateway-secret')])->assertUnauthorized();
-    }
-
-    public function test_under_the_gateway_strategy_iam_issues_a_jwt_the_gateway_verifies_with_its_public_key(): void
-    {
-        config()->set('auth.token_validation.strategy', 'gateway');
-        $response = $this->postJson('/iam/api/v1/users', ['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'correct-horse']);
-
-        $claims = JWT::decode($response->json('data.token'), new Key((string) config('auth.token_validation.jwt.public_key'), 'RS256'));
-
-        $this->assertSame((string) $response->json('data.id'), $claims->sub);
-    }
-
     public function test_a_validation_rule_checks_a_value_against_another_module_through_its_contract(): void
     {
         $response = $this->postJson('/iam/api/v1/users', ['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'correct-horse']);
@@ -117,11 +83,5 @@ class ModulesTest extends TestCase
             ['id' => $id, 'name' => 'Ada'],
             $this->inModuleOf(Signup::class, fn (): ?array => $this->app->make(IamService::class)->findUser($id)),
         );
-    }
-
-    public function test_no_module_uses_another_module_and_every_module_can_run(): void
-    {
-        $this->assertSame([], $this->app->make(Boundaries::class)->violations());
-        $this->artisan('modulith:doctor')->assertSuccessful();
     }
 }

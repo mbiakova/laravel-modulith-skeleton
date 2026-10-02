@@ -2,6 +2,10 @@
 
 namespace Apps\Iam\Tests\Feature;
 
+use Apps\Iam\Models\User;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use Foundation\Iam\Auth\GatewayTokens;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -48,6 +52,35 @@ class TokensTest extends TestCase
         }
 
         $this->postJson('/iam/api/v1/tokens', ['email' => 'ada@example.com', 'password' => 'wrong-horse'])->assertTooManyRequests();
+    }
+
+    public function test_iam_issues_a_jwt_the_modules_verify_with_its_public_key(): void
+    {
+        $token = $this->postJson('/iam/api/v1/tokens', ['email' => 'ada@example.com', 'password' => 'correct-horse'])->json('data.token');
+        [$header, $payload] = explode('.', $token);
+
+        $this->assertSame('RS256', json_decode(base64_decode($header), true)['alg']);
+        $this->getJson('/iam/api/v1/me', ['Authorization' => "Bearer {$header}.{$payload}.forged"])->assertUnauthorized();
+    }
+
+    public function test_the_gateway_strategy_trusts_only_an_identity_signed_with_the_shared_secret(): void
+    {
+        config()->set('auth.token_validation.strategy', 'gateway');
+        $id = $this->inModuleOf(User::class, fn (): int => (int) User::query()->value('id'));
+
+        $this->getJson('/iam/api/v1/me', ['X-Identity' => GatewayTokens::sign($id, time() + 60, 'testing-gateway-secret')])->assertOk()->assertJsonPath('data.id', $id);
+        $this->getJson('/iam/api/v1/me', ['X-Identity' => GatewayTokens::sign($id, time() + 60, 'wrong')])->assertUnauthorized();
+        $this->getJson('/iam/api/v1/me', ['X-Identity' => GatewayTokens::sign($id, time() - 1, 'testing-gateway-secret')])->assertUnauthorized();
+    }
+
+    public function test_under_the_gateway_strategy_iam_issues_a_jwt_the_gateway_verifies_with_its_public_key(): void
+    {
+        config()->set('auth.token_validation.strategy', 'gateway');
+        $token = $this->postJson('/iam/api/v1/tokens', ['email' => 'ada@example.com', 'password' => 'correct-horse'])->json('data.token');
+
+        $claims = JWT::decode($token, new Key((string) config('auth.token_validation.jwt.public_key'), 'RS256'));
+
+        $this->assertSame((string) $this->inModuleOf(User::class, fn (): int => (int) User::query()->value('id')), $claims->sub);
     }
 
     public function test_identity_turns_a_valid_jwt_into_the_x_identity_the_gateway_strategy_trusts(): void

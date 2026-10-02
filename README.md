@@ -11,6 +11,17 @@ composer create-project mk-josias/laravel-modulith-skeleton my-app
 
 Requires PHP 8.4+, and Redis for the event stream.
 
+`create-project` asks two questions, through `php artisan skeleton:setup`:
+
+| Question | Default | What it changes |
+|---|---|---|
+| Which example modules do you keep? | all | removes `analytics` or `notifications`: its folders, its declaration, its tests, its `auth.permissions` entry and its Docker service. `iam` always stays: authentication, permissions and the user copies rely on it. |
+| How do the modules validate a token? | `jwt` | `AUTH_TOKEN_VALIDATION_STRATEGY` in `.env`, and a random `AUTH_GATEWAY_SECRET` for `gateway`. See [Choosing a strategy](#choosing-a-strategy). |
+
+Without a terminal (`--no-interaction`), it keeps everything and `jwt`. It runs once: it then
+deletes itself and its line in `composer.json`, so it can never remove a module that has become
+yours.
+
 ## Running it
 
 ```bash

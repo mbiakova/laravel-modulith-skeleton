@@ -22,6 +22,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        config()->set('auth.token_validation.strategy', 'jwt');
         config()->set('auth.token_validation.jwt.public_key', self::jwtKeys()['public']);
         config()->set('auth.token_validation.jwt.private_key', self::jwtKeys()['private']);
         config()->set('auth.token_validation.gateway.secret', 'testing-gateway-secret');
