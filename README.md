@@ -1,7 +1,7 @@
 # Laravel Modulith skeleton
 
 A Laravel application set up with
-[laravel-modulith](https://github.com/mk-josias/laravel-modulith). It comes with three example
+[laravel-modulith](https://github.com/mbiakova/laravel-modulith). It comes with three example
 modules, `iam`, `analytics` and `notifications`, each with its own database. You can read them to see how a module
 is written, then replace them with your own.
 
