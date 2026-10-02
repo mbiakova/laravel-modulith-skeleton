@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "mk-josias/laravel-modulith-skeleton",
+    "name": "mbiakova/laravel-modulith-skeleton",
     "type": "project",
     "description": "Application skeleton for laravel-modulith: a modular monolith deployable as one process or as per-module services.",
     "keywords": ["laravel", "modular-monolith", "modulith", "skeleton"],
