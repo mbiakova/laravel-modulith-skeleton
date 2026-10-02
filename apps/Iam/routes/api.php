@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Apps\Iam\Http\Controllers\IdentityController;
 use Apps\Iam\Http\Controllers\TokenController;
 use Apps\Iam\Http\Controllers\UserController;
 use Foundation\Common\Auth\Authenticate;
@@ -14,4 +15,5 @@ Route::prefix('v1')->group(function (): void {
     });
 
     Route::get('me', [UserController::class, 'me'])->middleware(Authenticate::class);
+    Route::get('identity', IdentityController::class);
 });

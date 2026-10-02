@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use Apps\Analytics\Models\Signup;
 use Apps\Iam\Models\User;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use Foundation\Iam\Auth\GatewayTokens;
 use Foundation\Iam\Contracts\IamService;
 use Foundation\Iam\Services\IamRpcService;
@@ -77,6 +79,16 @@ class ModulesTest extends TestCase
         $this->getJson('/iam/api/v1/me', ['X-Identity' => $identity])->assertOk()->assertJsonPath('data.id', $id);
         $this->getJson('/iam/api/v1/me', ['X-Identity' => GatewayTokens::sign($id, time() + 60, 'wrong')])->assertUnauthorized();
         $this->getJson('/iam/api/v1/me', ['X-Identity' => GatewayTokens::sign($id, time() - 1, 'testing-gateway-secret')])->assertUnauthorized();
+    }
+
+    public function test_under_the_gateway_strategy_iam_issues_a_jwt_the_gateway_verifies_with_its_public_key(): void
+    {
+        config()->set('auth.token_validation.strategy', 'gateway');
+        $response = $this->postJson('/iam/api/v1/users', ['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'correct-horse']);
+
+        $claims = JWT::decode($response->json('data.token'), new Key((string) config('auth.token_validation.jwt.public_key'), 'RS256'));
+
+        $this->assertSame((string) $response->json('data.id'), $claims->sub);
     }
 
     public function test_a_validation_rule_checks_a_value_against_another_module_through_its_contract(): void

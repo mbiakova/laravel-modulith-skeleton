@@ -50,6 +50,18 @@ class TokensTest extends TestCase
         $this->postJson('/iam/api/v1/tokens', ['email' => 'ada@example.com', 'password' => 'wrong-horse'])->assertTooManyRequests();
     }
 
+    public function test_identity_turns_a_valid_jwt_into_the_x_identity_the_gateway_strategy_trusts(): void
+    {
+        $token = $this->postJson('/iam/api/v1/tokens', ['email' => 'ada@example.com', 'password' => 'correct-horse'])->json('data.token');
+
+        $identity = (string) $this->get('/iam/api/v1/identity', ['Authorization' => "Bearer {$token}"])->assertNoContent()->headers->get('X-Identity');
+        config()->set('auth.token_validation.strategy', 'gateway');
+
+        $this->getJson('/iam/api/v1/me', ['X-Identity' => $identity])->assertOk()->assertJsonPath('data.id', 1);
+        $this->get('/iam/api/v1/identity', ['Authorization' => 'Bearer forged'])->assertUnauthorized();
+        $this->get('/iam/api/v1/identity')->assertUnauthorized();
+    }
+
     public function test_a_password_shorter_than_eight_characters_is_refused_at_registration(): void
     {
         $this->postJson('/iam/api/v1/users', ['name' => 'Grace', 'email' => 'grace@example.com', 'password' => 'short'])

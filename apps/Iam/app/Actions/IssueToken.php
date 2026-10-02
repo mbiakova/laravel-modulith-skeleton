@@ -8,12 +8,12 @@ use Apps\Iam\Models\User;
 use Firebase\JWT\JWT;
 use Illuminate\Support\Str;
 
-/** The token the client sends back: a JWT under the jwt strategy, an opaque one iam stores the hash of otherwise. */
+/** rpc: an opaque token only iam can read. jwt and gateway: a JWT anyone with iam's public key can verify. */
 final readonly class IssueToken
 {
     public function execute(User $user): string
     {
-        if (config('auth.token_validation.strategy') === 'jwt') {
+        if (config('auth.token_validation.strategy') !== 'rpc') {
             return JWT::encode([
                 'sub' => (string) $user->getKey(),
                 'iat' => time(),

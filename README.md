@@ -156,15 +156,25 @@ A module reads another module's data in two ways, and the skeleton shows both:
 any module can use it. These classes are yours: the package doesn't depend on them, so you can
 change or delete them.
 
-| Path | What it does |
+How strongly each piece is meant is labelled:
+
+| Label | Meaning |
 |---|---|
-| `Http/Controller`, `ApiRequest`, `Resource`, `ApiErrorCode` | Base controller and request, and the response format: `{success, data}` or `{success, code, message}`. |
-| `Auth/Authenticate`, `Principal`, `Principals`, `IsPrincipal`, `TokenValidator`, `HasPrincipal` | Token authentication for module routes. |
-| `Contracts/Action`, `Operation` | One class per use case. |
-| `Contracts/Repository`, `Database/EloquentRepository`, `Searchable` | Queries with filters, sorts and includes, and a single place for writes. |
-| `Data/Dto` | Typed input and event payloads, built on spatie/laravel-data. |
-| `Validation/ReferenceRule` | A field holding the id of another module's record: checks it exists through that module's contract, then runs the constraints a subclass adds to `$checks`. |
-| `Exceptions/DomainException`, `IntegrityException` | Business errors (400) and system errors (500). |
+| Mechanism | the modules rely on it working this way across processes; replace it only with something that keeps the same guarantee |
+| Default | a sensible choice that works as shipped; swap it freely |
+| Proposal | one way to structure the code, shown so you can judge it |
+| Taste | a style choice, nothing depends on it |
+
+| Path | What it does | Label |
+|---|---|---|
+| `Http/Controller`, `ApiRequest`, `Resource`, `ApiErrorCode` | Base controller and request, and the response format: `{success, data}` or `{success, code, message}`. | Taste |
+| `Auth/Authenticate`, `Principal`, `Principals`, `IsPrincipal`, `TokenValidator`, `HasPrincipal` | Token authentication for module routes: a token gives an id, the running module's own database gives the user. | Mechanism |
+| `Policies/Policy` | Checks a permission against `IamService::grants()`, which works wherever iam runs. | Mechanism |
+| `Contracts/Action`, `Operation` | One class per use case. | Proposal |
+| `Contracts/Repository`, `Database/EloquentRepository`, `Searchable` | Queries with filters, sorts and includes, and a single place for writes. | Proposal |
+| `Data/Dto` | Typed input and event payloads, built on spatie/laravel-data. | Default |
+| `Validation/ReferenceRule` | A field holding the id of another module's record: checks it exists through that module's contract, then runs the constraints a subclass adds to `$checks`. | Mechanism |
+| `Exceptions/DomainException`, `IntegrityException` | Business errors (400) and system errors (500). | Taste |
 
 `bootstrap/app.php` renders the exceptions that implement `RendersApiEnvelope` in the response
 format above.
@@ -196,6 +206,68 @@ once it has consumed `iam.user.registered`.
 
 In a controller that extends `Foundation\Common\Http\Controller`, `$this->principalId()` returns the id of
 the authenticated user.
+
+### Choosing a strategy
+
+Every process reads one strategy, and every process of an application must read the same one:
+iam issues its tokens for it.
+
+| | `jwt` | `rpc` | `gateway` |
+|---|---|---|---|
+| Token iam issues | a JWT, `sub` = the user id, valid `AUTH_JWT_TTL` seconds | an opaque token; iam stores its hash, one per user | a JWT, as under `jwt`: the gateway verifies it |
+| Cost per request | a signature check, no call | one RPC call to iam (`findUserByToken` is not cached) | an HMAC check, no call |
+| Revoking a token | not possible before it expires | issuing a new one (`POST /iam/api/v1/tokens`) replaces it at once | up to the gateway |
+| Who is trusted | whoever holds iam's private key | iam | the gateway: anyone who can reach a module directly with a valid `X-Identity` is that user |
+| Settings | `AUTH_JWT_PUBLIC_KEY` everywhere, `AUTH_JWT_PRIVATE_KEY` on iam | none | `AUTH_GATEWAY_SECRET` everywhere, the JWT keys on iam and the gateway |
+
+### Behind a gateway
+
+A gateway in front of the modules, in any language, works with the `gateway` strategy:
+
+```
+client ── Bearer <JWT from iam> ──► gateway ── X-Identity: {id}.{exp}.{hmac} ──► module routes
+                                     │ verifies the JWT with iam's public key
+                                     │ signs hex(hmac_sha256(AUTH_GATEWAY_SECRET, "{id}.{exp}"))
+```
+
+The gateway forwards `POST /iam/api/v1/users` and `/tokens` as they are, and adds `X-Identity` to
+every other request. It must also:
+
+- drop any `X-Identity` the client sent;
+- never forward `/*/rpc/*`: those routes accept any caller holding the RPC secret;
+- be the only way in: the modules' ports stay private.
+
+A proxy (Traefik, nginx, Envoy) can be that gateway without any code of its own: its forward-auth
+asks iam, and `GET /iam/api/v1/identity` answers 204 with the `X-Identity` header for a valid JWT,
+401 otherwise. With Traefik, for instance:
+
+```yaml
+# the labels of the module containers, behind Traefik
+traefik.http.middlewares.identity.forwardauth.address: "http://iam.svc:8000/iam/api/v1/identity"
+traefik.http.middlewares.identity.forwardauth.authResponseHeaders: "X-Identity"   # replaces the client's
+traefik.http.routers.analytics.rule: "PathPrefix(`/analytics/api`)"                # /analytics/rpc stays out
+traefik.http.routers.analytics.middlewares: "identity"
+```
+
+This configuration hasn't been run against a Traefik instance; the route it calls is tested in
+`apps/Iam/tests/Feature/TokensTest.php`. With nginx, `auth_request` and `auth_request_set` do the same.
+
+To let the gateway emit events or call the modules itself, see "Services in other languages" in
+the package's README.
+
+### Without authentication
+
+The package has no authentication of its own: all of it lives in this skeleton, in
+`foundation/Common/Auth`, `foundation/Common/Policies` and `foundation/Iam/Auth`. These use them:
+
+| File | What to remove |
+|---|---|
+| `foundation/FoundationServiceProvider.php` | the `TokenValidator` binding |
+| `apps/*/routes/api.php` | the `Authenticate` middleware |
+| `foundation/Common/Http/Controller.php`, `ApiRequest.php` | `use HasPrincipal` |
+| `apps/Iam/app/Models/User.php`, `foundation/Iam/Shadows/UserShadow.php` | `IsPrincipal` and `implements Principal` |
+| `apps/Analytics/app/Policies/DatasetPolicy.php` | the policy, and `authorize()` in `DatasetController` |
+| `tests/Feature/ModulesTest.php`, `AnalyticsAloneTest.php` | the tests that send a token |
 
 ## Permissions
 
