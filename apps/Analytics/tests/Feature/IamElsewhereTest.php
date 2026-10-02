@@ -1,28 +1,29 @@
 <?php
 
-namespace Tests\Feature;
+namespace Apps\Analytics\Tests\Feature;
 
-use Apps\Analytics\Models\UserShadow;
-use Firebase\JWT\JWT;
 use Foundation\Iam\Auth\GatewayTokens;
 use Foundation\Iam\Contracts\IamService;
 use Foundation\Iam\Services\IamRpcService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Modulith\Services\Rpc\RpcSignature;
-use Tests\TestCase;
+use Tests\ModuleTestCase;
 
-/** analytics runs in this process, iam in another one: every read of iam is a signed HTTP call. */
-class AnalyticsAloneTest extends TestCase
+/** Every read of iam is a signed HTTP call, under each token strategy. */
+class IamElsewhereTest extends ModuleTestCase
 {
+    protected string $module = 'analytics';
+
+    /** @var array{Authorization: string} */
+    private array $jwt;
+
     protected function setUp(): void
     {
-        $this->setEnvironment(['MODULITH_RUNS' => 'analytics', 'MODULITH_IAM_HOST' => 'http://iam.test']);
-
         parent::setUp();
 
         config()->set('auth.token_validation.strategy', 'rpc');
-        $this->inModuleOf(UserShadow::class, fn () => UserShadow::sync(1, ['name' => 'Ada']));
+        $this->jwt = $this->user(1, 'Ada');
 
         Http::fake([
             'iam.test/iam/rpc/findUserByToken' => fn (Request $request) => $request['arguments']['token'] === 'ada-token'
@@ -32,13 +33,6 @@ class AnalyticsAloneTest extends TestCase
                 ? Http::response(['id' => 1, 'name' => 'Ada'])
                 : Http::response(null, 404),
         ]);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->setEnvironment(['MODULITH_RUNS' => null, 'MODULITH_IAM_HOST' => null]);
-
-        parent::tearDown();
     }
 
     public function test_the_contract_is_answered_by_the_rpc_service(): void
@@ -60,9 +54,8 @@ class AnalyticsAloneTest extends TestCase
     public function test_the_jwt_strategy_authenticates_a_token_iam_signed_without_calling_iam(): void
     {
         config()->set('auth.token_validation.strategy', 'jwt');
-        $token = JWT::encode(['sub' => '1', 'exp' => time() + 60], (string) config('auth.token_validation.jwt.private_key'), 'RS256');
 
-        $this->getJson('/analytics/api/v1/signups', ['Authorization' => "Bearer {$token}"])->assertOk();
+        $this->getJson('/analytics/api/v1/signups', $this->jwt)->assertOk();
         $this->getJson('/analytics/api/v1/signups', ['Authorization' => 'Bearer ada-token'])->assertUnauthorized();
 
         Http::assertNothingSent();
@@ -87,19 +80,5 @@ class AnalyticsAloneTest extends TestCase
         $this->getJson('/analytics/api/v1/signups?user_id=999', $headers)
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['user_id' => 'No user has this id.']);
-    }
-
-    /** @param array<string, string|null> $variables */
-    private function setEnvironment(array $variables): void
-    {
-        foreach ($variables as $name => $value) {
-            if ($value === null) {
-                putenv($name);
-                unset($_ENV[$name], $_SERVER[$name]);
-            } else {
-                putenv("{$name}={$value}");
-                $_ENV[$name] = $_SERVER[$name] = $value;
-            }
-        }
     }
 }

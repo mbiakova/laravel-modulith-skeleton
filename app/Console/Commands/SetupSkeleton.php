@@ -26,14 +26,14 @@ final class SetupSkeleton extends Command
      */
     private const array REMOVABLE = [
         'analytics' => [
-            'tests' => ['AnalyticsAloneTest', 'DatasetsTest', 'ModulesTest', 'PermissionsTest'],
+            'tests' => ['ModulesTest'],
             'lines' => ['config/auth.php' => [
                 "use Foundation\\Analytics\\Enums\\AnalyticsPermission;\n\n",
                 "        AnalyticsPermission::class,\n",
             ]],
         ],
         'notifications' => [
-            'tests' => ['NotificationsTest'],
+            'tests' => [],
             'lines' => [],
         ],
     ];

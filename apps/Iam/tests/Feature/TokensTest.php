@@ -7,10 +7,12 @@ use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Foundation\Iam\Auth\GatewayTokens;
 use Illuminate\Support\Facades\DB;
-use Tests\TestCase;
+use Tests\ModuleTestCase;
 
-class TokensTest extends TestCase
+class TokensTest extends ModuleTestCase
 {
+    protected string $module = 'iam';
+
     protected function setUp(): void
     {
         parent::setUp();

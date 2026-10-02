@@ -370,13 +370,39 @@ php artisan test
 ```
 
 `tests/TestCase.php` gives each module an empty sqlite file and runs `migrate` before every
-test. `tests/Feature/ModulesTest.php` covers the flow above, and checks that no module uses
-another module's classes (`Modulith\Testing\Boundaries`) and that `modulith:doctor` passes.
+test.
+
+A module is tested alone, the way it runs once it has its own process. Its tests live in
+`apps/{Module}/tests/` and extend `Tests\ModuleTestCase`, which runs that module only
+(`MODULITH_RUNS`) and stands in for iam:
+
+```php
+class InboxTest extends ModuleTestCase
+{
+    protected string $module = 'notifications';
+
+    public function test_a_registered_user_finds_a_welcome(): void
+    {
+        $headers = $this->user(1, 'ada');                                        // its copy, and a token
+        $this->receive('notifications', IamEvent::UserRegistered->value, ['id' => 1]);   // as iam would announce it
+
+        $this->getJson('/notifications/api/v1/notifications', $headers)->assertJsonCount(1, 'data');
+    }
+}
+```
+
+| Helper | What it does |
+|---|---|
+| `user($id, $name, $permissions)` | writes the user's copy in the module's database, makes iam answer `$permissions` to `grants()`, and returns the `Authorization` header of a valid token |
+| `receive($module, $name, $payload)` | hands the module an event as its emitter would have announced it (from the package) |
+
+Because a module's tests name no other module's class, `Boundaries` holds for them too.
 
 | Where | What it holds |
 |---|---|
-| `tests/Feature/` | the tests that cross modules: registration, then what analytics and notifications make of it |
-| `apps/{Module}/tests/` | the tests that only need that module, such as `apps/Iam/tests/Feature/TokensTest.php`; `phpunit.xml` lists them in the `Modules` suite |
+| `apps/{Module}/tests/` | the module alone; `phpunit.xml` lists them in the `Modules` suite |
+| `tests/Feature/ModulesTest.php` | the one flow that crosses modules, every module in one process: registration, then what analytics makes of it |
+| `tests/Feature/ArchitectureTest.php` | no module uses another module's classes (`Modulith\Testing\Boundaries`), and `modulith:doctor` passes |
 
 `php artisan make:test InvoiceTest --module=billing` writes a test in the module.
 
