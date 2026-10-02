@@ -1,14 +1,17 @@
 <?php
 
-namespace Tests\Feature;
+namespace Apps\Notifications\Tests\Feature;
 
-use Tests\TestCase;
+use Foundation\Iam\Events\IamEvent;
+use Tests\ModuleTestCase;
 
-class NotificationsTest extends TestCase
+class InboxTest extends ModuleTestCase
 {
+    protected string $module = 'notifications';
+
     public function test_a_registered_user_finds_a_welcome_in_the_inbox_and_marks_it_read(): void
     {
-        $headers = ['Authorization' => 'Bearer '.$this->register('ada')];
+        $headers = $this->registered(1, 'ada');
 
         $this->getJson('/notifications/api/v1/notifications', $headers)->assertOk()
             ->assertJsonCount(1, 'data')
@@ -25,7 +28,7 @@ class NotificationsTest extends TestCase
 
     public function test_the_inbox_pages_and_refuses_a_filter_it_does_not_allow(): void
     {
-        $headers = ['Authorization' => 'Bearer '.$this->register('ada')];
+        $headers = $this->registered(1, 'ada');
 
         $this->getJson('/notifications/api/v1/notifications?paginate=1', $headers)->assertOk()
             ->assertJsonCount(1, 'data')
@@ -36,8 +39,8 @@ class NotificationsTest extends TestCase
 
     public function test_nobody_reads_or_marks_the_notification_of_someone_else(): void
     {
-        $ada = ['Authorization' => 'Bearer '.$this->register('ada')];
-        $grace = ['Authorization' => 'Bearer '.$this->register('grace')];
+        $ada = $this->registered(1, 'ada');
+        $grace = $this->registered(2, 'grace');
         $adas = $this->getJson('/notifications/api/v1/notifications', $ada)->json('data.0.id');
 
         $this->getJson('/notifications/api/v1/notifications', $grace)->assertOk()
@@ -48,17 +51,18 @@ class NotificationsTest extends TestCase
 
     public function test_a_welcome_is_sent_once_however_many_times_the_event_arrives(): void
     {
-        $headers = ['Authorization' => 'Bearer '.$this->register('ada')];
-        $this->artisan('modulith:events:consume --module=notifications')->assertSuccessful();
+        $headers = $this->registered(1, 'ada');
+        $this->receive('notifications', IamEvent::UserRegistered->value, ['id' => 1]);
 
         $this->getJson('/notifications/api/v1/notifications', $headers)->assertOk()->assertJsonCount(1, 'data');
     }
 
-    private function register(string $name): string
+    /** @return array{Authorization: string} */
+    private function registered(int $id, string $name): array
     {
-        $token = $this->postJson('/iam/api/v1/users', ['name' => $name, 'email' => "{$name}@example.com", 'password' => 'correct-horse'])->json('data.token');
-        $this->artisan('modulith:events:consume --module=notifications')->assertSuccessful();
+        $headers = $this->user($id, $name);
+        $this->receive('notifications', IamEvent::UserRegistered->value, ['id' => $id]);
 
-        return $token;
+        return $headers;
     }
 }

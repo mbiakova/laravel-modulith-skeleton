@@ -1,18 +1,18 @@
 <?php
 
-namespace Tests\Feature;
+namespace Apps\Iam\Tests\Feature;
 
 use Apps\Iam\Actions\GrantRole;
 use Apps\Iam\Actions\SetRolePermissions;
 use Apps\Iam\Models\User;
-use Foundation\Analytics\Enums\AnalyticsPermission;
+use Apps\Iam\Tests\Fixtures\SamplePermission;
 use Foundation\Iam\Contracts\IamService;
 use Illuminate\Support\Facades\DB;
-use Tests\TestCase;
+use Tests\ModuleTestCase;
 
-class PermissionsTest extends TestCase
+class PermissionsTest extends ModuleTestCase
 {
-    private string $token;
+    protected string $module = 'iam';
 
     private User $user;
 
@@ -20,38 +20,36 @@ class PermissionsTest extends TestCase
     {
         parent::setUp();
 
+        config()->set('auth.permissions', [SamplePermission::class]);
         $this->artisan('iam:sync-permissions')->expectsOutputToContain('1 permissions declared, 0 deleted.')->assertSuccessful();
-        $this->token = $this->postJson('/iam/api/v1/users', ['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'correct-horse'])->json('data.token');
-        $this->artisan('modulith:events:consume --module=analytics')->assertSuccessful();
+        $this->postJson('/iam/api/v1/users', ['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'correct-horse'])->assertCreated();
         $this->user = $this->inModuleOf(User::class, fn (): User => User::query()->firstOrFail());
     }
 
-    public function test_a_gesture_needs_its_permission_and_the_grant_takes_effect_at_once(): void
+    public function test_a_grant_and_a_revocation_are_answered_at_once_despite_the_cache(): void
     {
-        $headers = ['Authorization' => "Bearer {$this->token}"];
-
-        $this->getJson('/analytics/api/v1/datasets', $headers)->assertForbidden();
+        $this->assertSame([], app(IamService::class)->grants($this->user->id));
 
         $this->inModuleOf(User::class, function (): void {
-            app(SetRolePermissions::class)->execute('analyst', [AnalyticsPermission::ReadDatasets]);
+            app(SetRolePermissions::class)->execute('analyst', [SamplePermission::Read]);
             app(GrantRole::class)->grant($this->user, 'analyst');
         });
 
-        $this->getJson('/analytics/api/v1/datasets', $headers)->assertOk();
+        $this->assertSame(['sample.read'], app(IamService::class)->grants($this->user->id));
 
         $this->inModuleOf(User::class, fn () => app(GrantRole::class)->revoke($this->user, 'analyst'));
 
-        $this->getJson('/analytics/api/v1/datasets', $headers)->assertForbidden();
+        $this->assertSame([], app(IamService::class)->grants($this->user->id));
     }
 
     public function test_changing_a_role_drops_the_cached_grants_of_every_user_holding_it(): void
     {
         $this->inModuleOf(User::class, function (): void {
-            app(SetRolePermissions::class)->execute('analyst', [AnalyticsPermission::ReadDatasets]);
+            app(SetRolePermissions::class)->execute('analyst', [SamplePermission::Read]);
             app(GrantRole::class)->grant($this->user, 'analyst');
         });
 
-        $this->assertSame(['analytics.datasets.read'], app(IamService::class)->grants($this->user->id));
+        $this->assertSame(['sample.read'], app(IamService::class)->grants($this->user->id));
 
         $this->inModuleOf(User::class, fn () => app(SetRolePermissions::class)->execute('analyst', []));
 
