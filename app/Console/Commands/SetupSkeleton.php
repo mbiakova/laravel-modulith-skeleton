@@ -74,11 +74,16 @@ final class SetupSkeleton extends Command
     /** Run again later, it would delete a module that has since become the application's own code. */
     private function removeItself(): void
     {
-        $composer = base_path('composer.json');
-        file_put_contents($composer, str_replace("            \"@php artisan skeleton:setup --ansi\",\n", '', (string) file_get_contents($composer)));
+        $this->strip('composer.json', [
+            "            \"@php artisan skeleton:setup --ansi\",\n",
+            "            \"App\\\\\": \"app/\",\n",
+        ]);
+        $this->strip('phpstan.neon.dist', ["        - app\n"]);
+        $this->strip('phpunit.xml', ["            <directory>app</directory>\n"]);
         @unlink(__FILE__);
         @rmdir(dirname(__FILE__));
         @rmdir(dirname(__FILE__, 2));
+        @rmdir(dirname(__FILE__, 3));
     }
 
     private function remove(string $module): void
@@ -90,7 +95,7 @@ final class SetupSkeleton extends Command
         }
 
         foreach (self::REMOVABLE[$module]['lines'] as $file => $lines) {
-            file_put_contents(base_path($file), str_replace($lines, '', (string) file_get_contents(base_path($file))));
+            $this->strip($file, $lines);
         }
 
         $this->removeFromCompose($module);
@@ -113,6 +118,12 @@ final class SetupSkeleton extends Command
             );
             file_put_contents(base_path($file), $contents);
         }
+    }
+
+    /** @param list<string> $lines */
+    private function strip(string $file, array $lines): void
+    {
+        file_put_contents(base_path($file), str_replace($lines, '', (string) file_get_contents(base_path($file))));
     }
 
     private function setEnv(string $key, string $value): void
