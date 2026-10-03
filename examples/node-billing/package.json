@@ -1,0 +1,12 @@
+{
+  "name": "node-billing",
+  "private": true,
+  "type": "module",
+  "description": "A Node service taking part in the modules' events and RPC, as docs/other-languages.md of laravel-modulith describes.",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "redis": "^4.7.0"
+  }
+}
